@@ -221,6 +221,7 @@ func (c *controller) NewNetwork(networkType, name string, options ...NetworkOpti
 		id:          types.UUID(stringid.GenerateRandomID()),
 		ctrlr:       c,
 		endpoints:   endpointTable{},
+		dbExists:    false,
 	}
 
 	network.processOptions(options...)
@@ -230,6 +231,7 @@ func (c *controller) NewNetwork(networkType, name string, options ...NetworkOpti
 	}
 
 	if err := c.updateNetworkToStore(network); err != nil {
+		log.Warnf("couldnt create network %s: %v", network.name, err)
 		if e := network.Delete(); e != nil {
 			log.Warnf("couldnt cleanup network %s: %v", network.name, err)
 		}

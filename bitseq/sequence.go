@@ -29,6 +29,7 @@ type Handle struct {
 	app        string
 	id         string
 	dbIndex    uint64
+	dbExists   bool
 	store      datastore.DataStore
 	sync.Mutex
 }
@@ -55,14 +56,7 @@ func NewHandle(app string, ds datastore.DataStore, id string, numElements uint32
 	h.watchForChanges()
 
 	// Get the initial status from the ds if present.
-	// We will be getting an instance without a dbIndex
-	// (GetObject() does not set it): It is ok for now,
-	// it will only cause the first allocation on this
-	// node to go through a retry.
-	var bs []byte
-	if err := h.store.GetObject(datastore.Key(h.Key()...), bs); err == nil {
-		h.FromByteArray(bs)
-	} else if err != store.ErrKeyNotFound {
+	if err := h.store.GetObject(datastore.Key(h.Key()...), h); err != store.ErrKeyNotFound {
 		return nil, err
 	}
 	return h, nil
@@ -197,7 +191,14 @@ func (h *Handle) CheckIfAvailable(ordinal int) (int, int, error) {
 func (h *Handle) PushReservation(bytePos, bitPos int, release bool) error {
 	// Create a copy of the current handler
 	h.Lock()
-	nh := &Handle{app: h.app, id: h.id, store: h.store, dbIndex: h.dbIndex, head: h.head.GetCopy()}
+	nh := &Handle{
+		app:      h.app,
+		id:       h.id,
+		store:    h.store,
+		dbIndex:  h.dbIndex,
+		head:     h.head.GetCopy(),
+		dbExists: h.dbExists,
+	}
 	h.Unlock()
 
 	nh.head = PushReservation(bytePos, bitPos, nh.head, release)
@@ -267,12 +268,6 @@ func (h *Handle) Unselected() uint32 {
 	h.Lock()
 	defer h.Unlock()
 	return h.unselected
-}
-
-func (h *Handle) getDBIndex() uint64 {
-	h.Lock()
-	defer h.Unlock()
-	return h.dbIndex
 }
 
 // GetFirstAvailable looks for the first unset bit in passed mask

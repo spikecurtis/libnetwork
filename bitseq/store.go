@@ -28,6 +28,11 @@ func (h *Handle) Value() []byte {
 	return b
 }
 
+// SetValue unmarshals the data from the KV store
+func (h *Handle) SetValue(value []byte) error {
+	return h.FromByteArray(value)
+}
+
 // Index returns the latest DB Index as seen by this object
 func (h *Handle) Index() uint64 {
 	h.Lock()
@@ -39,7 +44,15 @@ func (h *Handle) Index() uint64 {
 func (h *Handle) SetIndex(index uint64) {
 	h.Lock()
 	h.dbIndex = index
+	h.dbExists = true
 	h.Unlock()
+}
+
+// Exists method is true if this object has been stored in the DB.
+func (h *Handle) Exists() bool {
+	h.Lock()
+	defer h.Unlock()
+	return h.dbExists
 }
 
 func (h *Handle) watchForChanges() error {
@@ -60,9 +73,9 @@ func (h *Handle) watchForChanges() error {
 			select {
 			case kvPair := <-kvpChan:
 				// Only process remote update
-				if kvPair != nil && (kvPair.LastIndex != h.getDBIndex()) {
+				if kvPair != nil && (kvPair.LastIndex != h.Index()) {
 					h.Lock()
-					h.dbIndex = kvPair.LastIndex
+					h.SetIndex(kvPair.LastIndex)
 					h.Unlock()
 					h.FromByteArray(kvPair.Value)
 				}

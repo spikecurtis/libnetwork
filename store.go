@@ -186,15 +186,15 @@ func (c *controller) watchNetworks() error {
 						continue
 					}
 					delete(tmpview, n.id)
-					n.dbIndex = kve.LastIndex
+					n.SetIndex(kve.LastIndex)
 					c.Lock()
 					existing, ok := c.networks[n.id]
 					c.Unlock()
 					if ok {
 						existing.Lock()
 						// Skip existing network update
-						if existing.dbIndex != n.dbIndex {
-							existing.dbIndex = n.dbIndex
+						if existing.Index() != n.Index() {
+							existing.SetIndex(n.Index())
 							existing.endpointCnt = n.endpointCnt
 						}
 						existing.Unlock()
@@ -265,7 +265,7 @@ func (n *network) watchEndpoints() error {
 						continue
 					}
 					delete(tmpview, ep.id)
-					ep.dbIndex = epe.LastIndex
+					ep.SetIndex(epe.LastIndex)
 					ep.network = n
 					if n.ctrlr.processEndpointUpdate(&ep) {
 						err = n.ctrlr.newEndpointFromStore(epe.Key, &ep)
@@ -327,8 +327,8 @@ func (c *controller) processEndpointUpdate(ep *endpoint) bool {
 
 	ee := existing.(*endpoint)
 	ee.Lock()
-	if ee.dbIndex != ep.dbIndex {
-		ee.dbIndex = ep.dbIndex
+	if ee.Index() != ep.Index() {
+		ee.SetIndex(ep.Index())
 		if ee.container != nil && ep.container != nil {
 			// we care only about the container id
 			ee.container.id = ep.container.id
